@@ -1,24 +1,24 @@
 /**
  * Supabase Client Configuration
- * 
- * This module provides both server-side and client-side Supabase clients
- * for database operations and real-time subscriptions.
- * 
- * Server client: Used in API routes and server components
- * Client: Used in browser components for real-time updates
+ *
+ * IMPORTANT:
+ * - This file is imported by API routes at build-time. If env vars are missing,
+ *   `createClient()` throws "supabaseUrl is required".
+ * - To keep builds working in environments where env vars are not present,
+ *   we provide safe fallbacks.
+ *
+ * In production you MUST set:
+ * - NEXT_PUBLIC_SUPABASE_URL
+ * - NEXT_PUBLIC_SUPABASE_ANON_KEY
+ * - SUPABASE_SERVICE_ROLE_KEY
  */
 
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key'
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-key'
 
-/**
- * Server-side Supabase client
- * Uses service role key for full database access
- * Used in API routes and server-side operations
- */
 export const supabaseServer = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
     autoRefreshToken: false,
@@ -26,11 +26,6 @@ export const supabaseServer = createClient(supabaseUrl, supabaseServiceKey, {
   },
 })
 
-/**
- * Client-side Supabase client
- * Uses anon key for browser operations
- * Respects Row Level Security (RLS) policies
- */
 export const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
@@ -38,10 +33,16 @@ export const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
   },
 })
 
-/**
- * Type definitions for database tables
- * These types are used throughout the application for type safety
- */
+export function isSupabaseConfigured() {
+  return (
+    !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
+    !!process.env.SUPABASE_SERVICE_ROLE_KEY &&
+    process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://placeholder.supabase.co'
+  )
+}
+
+// Types
 export interface Customer {
   id: string
   phone_number: string

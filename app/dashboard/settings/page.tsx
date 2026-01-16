@@ -1,35 +1,69 @@
 /**
- * Settings Page
+ * Settings Page (SaaS)
  *
- * Allows customers to configure their organization settings, specifically WhatsApp integration.
+ * Customers configure WhatsApp mapping for their own organization.
  *
- * IMPORTANT:
- * - For the SaaS production version, organizationId should come from auth/session.
- * - In this MVP, we ask for organizationId to keep it testable without auth.
+ * organization_id is derived from Supabase session server-side.
  */
 
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle, Save, ExternalLink, Copy } from 'lucide-react'
+import { AlertCircle, Save, ExternalLink, Copy, CheckCircle } from 'lucide-react'
 import { toast } from 'sonner'
+
+type Organization = {
+  id: string
+  name: string
+  email: string
+  whatsapp_phone_number_id: string | null
+  whatsapp_phone_number: string | null
+  whatsapp_configured: boolean
+}
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(false)
+  const [orgLoading, setOrgLoading] = useState(true)
+  const [organization, setOrganization] = useState<Organization | null>(null)
+
   const [formData, setFormData] = useState({
-    organizationId: '',
     whatsapp_phone_number_id: '',
     whatsapp_phone_number: '',
   })
 
-  const callbackUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/api/whatsapp/webhook`
-    : ''
+  const callbackUrl = useMemo(() => {
+    if (typeof window === 'undefined') return ''
+    return `${window.location.origin}/api/whatsapp/webhook`
+  }, [])
+
+  // Load organization info
+  useEffect(() => {
+    async function loadOrg() {
+      try {
+        const res = await fetch('/api/organization/me')
+        const json = await res.json()
+        if (!res.ok) throw new Error(json?.error || 'No se pudo cargar la organización')
+
+        const org = json.organization as Organization
+        setOrganization(org)
+        setFormData({
+          whatsapp_phone_number_id: org.whatsapp_phone_number_id || '',
+          whatsapp_phone_number: org.whatsapp_phone_number || '',
+        })
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'No se pudo cargar la organización')
+      } finally {
+        setOrgLoading(false)
+      }
+    }
+
+    loadOrg()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,7 +79,8 @@ export default function SettingsPage() {
       const json = await response.json()
       if (!response.ok) throw new Error(json?.error || 'Failed to save settings')
 
-      toast.success('Settings saved successfully')
+      toast.success('Configuración guardada')
+      setOrganization(json.organization)
     } catch (error) {
       console.error('Error saving settings:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to save settings')
@@ -58,13 +93,35 @@ export default function SettingsPage() {
     <div className="space-y-8 max-w-3xl">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground mt-2">
-          Configura tu organización e integraciones.
-        </p>
+        <p className="text-muted-foreground mt-2">Configura tu organización e integraciones.</p>
       </div>
 
+      {orgLoading ? (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>Cargando organización…</AlertDescription>
+        </Alert>
+      ) : organization ? (
+        <Alert className={organization.whatsapp_configured ? 'bg-green-50 border-green-200' : ''}>
+          {organization.whatsapp_configured ? (
+            <CheckCircle className="h-4 w-4 text-green-700" />
+          ) : (
+            <AlertCircle className="h-4 w-4" />
+          )}
+          <AlertDescription>
+            <b>Organización:</b> {organization.name} ({organization.email})
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            No se pudo cargar tu organización. Asegúrate de haber creado tu cuenta y que exista el registro en team_members.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="grid gap-6">
-        {/* WhatsApp Configuration Card */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -74,7 +131,7 @@ export default function SettingsPage() {
               WhatsApp Integration
             </CardTitle>
             <CardDescription>
-              Conecta tu WhatsApp Business para empezar a recibir mensajes.
+              Guarda tu <b>Phone Number ID</b>. Esto permite enrutar mensajes automáticamente a tu organización.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -93,29 +150,7 @@ export default function SettingsPage() {
               </AlertDescription>
             </Alert>
 
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                <b>MVP:</b> Por ahora debes pegar tu <code>organizationId</code> manualmente.
-                En la versión SaaS final, esto vendrá del login automáticamente.
-              </AlertDescription>
-            </Alert>
-
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid gap-2">
-                <Label htmlFor="org_id">Organization ID</Label>
-                <Input
-                  id="org_id"
-                  placeholder="uuid (ej: 550e8400-e29b-41d4-a716-446655440000)"
-                  value={formData.organizationId}
-                  onChange={(e) => setFormData({ ...formData, organizationId: e.target.value })}
-                  required
-                />
-                <p className="text-xs text-muted-foreground">
-                  Este ID es el de la tabla <code>organizations</code> en Supabase.
-                </p>
-              </div>
-
               <div className="grid gap-2">
                 <Label htmlFor="phone_id">Phone Number ID</Label>
                 <Input
@@ -126,7 +161,7 @@ export default function SettingsPage() {
                   required
                 />
                 <p className="text-xs text-muted-foreground">
-                  Meta Developers → WhatsApp → API Setup → "Phone number ID"
+                  Meta Developers → WhatsApp → API Setup → &quot;Phone number ID&quot;
                 </p>
               </div>
 
@@ -138,26 +173,20 @@ export default function SettingsPage() {
                   value={formData.whatsapp_phone_number}
                   onChange={(e) => setFormData({ ...formData, whatsapp_phone_number: e.target.value })}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Número visible (display_phone_number).
-                </p>
               </div>
 
-              <Button type="submit" disabled={loading} className="gap-2">
+              <Button type="submit" disabled={loading || !organization} className="gap-2">
                 <Save className="h-4 w-4" />
-                {loading ? 'Guardando...' : 'Guardar Configuración'}
+                {loading ? 'Guardando…' : 'Guardar Configuración'}
               </Button>
             </form>
           </CardContent>
         </Card>
 
-        {/* Webhook Info Card */}
         <Card>
           <CardHeader>
             <CardTitle>Webhook Configuration</CardTitle>
-            <CardDescription>
-              Configura esta URL en Meta Dashboard para recibir mensajes.
-            </CardDescription>
+            <CardDescription>Configura esta URL en Meta Dashboard para recibir mensajes.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-2">

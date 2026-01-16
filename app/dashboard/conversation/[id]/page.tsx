@@ -1,6 +1,6 @@
 /**
  * Conversation Detail Page
- * 
+ *
  * Shows full conversation history with a customer
  * Allows sending new messages and viewing customer details
  * Real-time message updates using Supabase subscriptions
@@ -8,7 +8,7 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { supabaseClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -35,12 +35,33 @@ interface Customer {
   status: string
 }
 
+/**
+ * NOTE:
+ * Supabase nested selects sometimes return arrays depending on relationship discovery.
+ * To avoid build-time type issues, we normalize `customer` to a single object.
+ */
 interface Conversation {
   id: string
   title: string
   status: string
   customer: Customer
   messages: Message[]
+}
+
+type ConversationRaw = Omit<Conversation, 'customer'> & {
+  customer: Customer | Customer[]
+}
+
+function normalizeCustomer(customer: Customer | Customer[] | null | undefined): Customer {
+  if (!customer) {
+    return {
+      id: 'unknown',
+      name: 'Unknown',
+      phone_number: '',
+      status: 'prospect',
+    }
+  }
+  return Array.isArray(customer) ? customer[0] : customer
 }
 
 export default function ConversationPage() {
@@ -53,8 +74,10 @@ export default function ConversationPage() {
   const [messageText, setMessageText] = useState('')
   const [sending, setSending] = useState(false)
 
+  // Memoize subscription channel name
+  const channelName = useMemo(() => `conversation-${conversationId}`, [conversationId])
+
   useEffect(() => {
-    // Fetch conversation and messages
     const fetchConversation = async () => {
       try {
         const { data, error } = await supabaseClient
@@ -73,8 +96,17 @@ export default function ConversationPage() {
 
         if (error) throw error
 
-        setConversation(data)
-        setMessages(data.messages || [])
+        const raw = data as unknown as ConversationRaw
+        const normalized: Conversation = {
+          id: raw.id,
+          title: raw.title,
+          status: raw.status,
+          customer: normalizeCustomer(raw.customer),
+          messages: raw.messages || [],
+        }
+
+        setConversation(normalized)
+        setMessages(normalized.messages)
       } catch (error) {
         console.error('Error fetching conversation:', error)
         toast.error('Failed to load conversation')
@@ -85,9 +117,8 @@ export default function ConversationPage() {
 
     fetchConversation()
 
-    // Subscribe to real-time message updates
     const subscription = supabaseClient
-      .channel(`conversation-${conversationId}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -105,7 +136,7 @@ export default function ConversationPage() {
     return () => {
       supabaseClient.removeChannel(subscription)
     }
-  }, [conversationId])
+  }, [conversationId, channelName])
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -117,7 +148,6 @@ export default function ConversationPage() {
     setSending(true)
 
     try {
-      // Send message via API
       const response = await fetch('/api/messages/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -162,7 +192,6 @@ export default function ConversationPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2 mb-2">
@@ -180,7 +209,6 @@ export default function ConversationPage() {
         </div>
       </div>
 
-      {/* Customer Info Card */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Customer Information</CardTitle>
@@ -205,7 +233,6 @@ export default function ConversationPage() {
         </CardContent>
       </Card>
 
-      {/* Messages */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Conversation</CardTitle>
@@ -238,7 +265,6 @@ export default function ConversationPage() {
             )}
           </div>
 
-          {/* Message Input */}
           <form onSubmit={handleSendMessage} className="flex gap-2 pt-4 border-t">
             <Input
               value={messageText}

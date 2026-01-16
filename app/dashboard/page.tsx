@@ -8,6 +8,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -217,9 +218,7 @@ export default function DashboardPage() {
                   </p>
                 </div>
               </div>
-              <Button className="w-full bg-green-600 hover:bg-green-700">
-                📖 Read Complete Setup Guide
-              </Button>
+              <Link href="/dashboard/onboarding"><Button className="w-full bg-green-600 hover:bg-green-700">📖 Open Onboarding Guide</Button></Link>
             </CardContent>
           </Card>
         </TabsContent>

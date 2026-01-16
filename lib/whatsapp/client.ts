@@ -141,7 +141,46 @@ export async function sendWhatsAppTemplate(
  * @param body - The webhook request body
  * @returns Parsed message data or null if not a message event
  */
-export function parseWhatsAppWebhook(body: any): {
+/**
+ * Parse incoming webhook event from WhatsApp
+ * Extracts message content and metadata
+ *
+ * @param body - The webhook request body
+ * @returns Parsed message data or null if not a message event
+ */
+
+type WhatsAppWebhookPayload = {
+  entry?: Array<{
+    changes?: Array<{
+      value?: WhatsAppWebhookValue
+    }>
+  }>
+}
+
+type WhatsAppWebhookValue = {
+  metadata?: {
+    phone_number_id?: string
+  }
+  messages?: WhatsAppWebhookMessage[]
+  contacts?: WhatsAppWebhookContact[]
+}
+
+type WhatsAppWebhookContact = {
+  wa_id: string
+}
+
+type WhatsAppWebhookMessage = {
+  id: string
+  timestamp: string
+  type: 'text' | 'image' | 'document' | 'audio' | 'video' | 'location' | string
+  text?: { body?: string }
+  image?: { caption?: string }
+  document?: { caption?: string }
+  video?: { caption?: string }
+  location?: { latitude?: number; longitude?: number }
+}
+
+export function parseWhatsAppWebhook(body: unknown): {
   messageId: string
   fromPhoneNumber: string
   messageText: string
@@ -150,56 +189,60 @@ export function parseWhatsAppWebhook(body: any): {
   phoneNumberId?: string
 } | null {
   try {
-    // Navigate through the webhook structure
-    const entry = body.entry?.[0]
+    const payload = body as WhatsAppWebhookPayload
+
+    const entry = payload.entry?.[0]
     const change = entry?.changes?.[0]
     const value = change?.value
 
-    // Check if this is a message event
-    if (!value?.messages || value.messages.length === 0) {
-      return null
-    }
+    const msg = value?.messages?.[0]
+    const contact = value?.contacts?.[0]
 
-    const message = value.messages[0]
-    const contact = value.contacts?.[0]
-    
-    // Extract the phone_number_id that received the message (critical for multi-tenant)
+    if (!msg || !contact) return null
+
     const phoneNumberId = value?.metadata?.phone_number_id
-
-    if (!message || !contact) {
-      return null
-    }
 
     // Extract message content based on type
     let messageText = ''
-    let messageType: 'text' | 'image' | 'document' | 'audio' | 'video' | 'location' | 'unknown' = 'unknown'
+    let messageType:
+      | 'text'
+      | 'image'
+      | 'document'
+      | 'audio'
+      | 'video'
+      | 'location'
+      | 'unknown' = 'unknown'
 
-    if (message.type === 'text') {
-      messageText = message.text?.body || ''
+    if (msg.type === 'text') {
+      messageText = msg.text?.body || ''
       messageType = 'text'
-    } else if (message.type === 'image') {
-      messageText = message.image?.caption || '[Image received]'
+    } else if (msg.type === 'image') {
+      messageText = msg.image?.caption || '[Image received]'
       messageType = 'image'
-    } else if (message.type === 'document') {
-      messageText = message.document?.caption || '[Document received]'
+    } else if (msg.type === 'document') {
+      messageText = msg.document?.caption || '[Document received]'
       messageType = 'document'
-    } else if (message.type === 'audio') {
+    } else if (msg.type === 'audio') {
       messageText = '[Audio message received]'
       messageType = 'audio'
-    } else if (message.type === 'video') {
-      messageText = message.video?.caption || '[Video received]'
+    } else if (msg.type === 'video') {
+      messageText = msg.video?.caption || '[Video received]'
       messageType = 'video'
-    } else if (message.type === 'location') {
-      const loc = message.location
-      messageText = `[Location: ${loc?.latitude}, ${loc?.longitude}]`
+    } else if (msg.type === 'location') {
+      const lat = msg.location?.latitude
+      const lng = msg.location?.longitude
+      messageText = '[Location: ' + (lat ?? '') + ', ' + (lng ?? '') + ']'
       messageType = 'location'
+    } else {
+      messageText = '[Unsupported message type]'
+      messageType = 'unknown'
     }
 
     return {
-      messageId: message.id,
+      messageId: msg.id,
       fromPhoneNumber: contact.wa_id,
       messageText,
-      timestamp: message.timestamp,
+      timestamp: Number(msg.timestamp),
       type: messageType,
       phoneNumberId,
     }
@@ -209,13 +252,6 @@ export function parseWhatsAppWebhook(body: any): {
   }
 }
 
-/**
- * Verify webhook token from WhatsApp
- * Called by WhatsApp to verify the webhook endpoint
- * 
- * @param token - The token from the webhook verification request
- * @returns true if token matches, false otherwise
- */
 export function verifyWebhookToken(token: string): boolean {
   const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN
   return token === verifyToken
