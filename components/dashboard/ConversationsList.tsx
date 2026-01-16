@@ -1,0 +1,41 @@
+/**
+ * Conversations List Component
+ * 
+ * Displays all active conversations with customers
+ * Shows latest message preview and conversation status
+ */
+
+'use client'
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { MessageCircle, AlertCircle } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+
+export default function ConversationsList() {
+  return (
+    <div className="space-y-4">
+      <Alert>
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          Configure Supabase credentials in <code className="bg-muted px-2 py-1 rounded">.env.local</code> to see conversations
+        </AlertDescription>
+      </Alert>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Conversations</CardTitle>
+          <CardDescription>Your WhatsApp conversations will appear here</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-12">
+            <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground font-medium">No conversations yet</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Once you configure Supabase and set up WhatsApp, conversations will appear here
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

@@ -1,0 +1,260 @@
+$ next dev --turbopack
+   ▲ Next.js 15.5.6 (Turbopack)
+   - Local:        http://localhost:3000
+   - Network:      http://169.254.0.21:3000
+
+ ✓ Starting...
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+ ✓ Ready in 1598ms
+ ○ Compiling / ...
+ GET / 200 in 6138ms
+ ✓ Compiled / in 6.2s
+ ⨯ Error: supabaseUrl is required.
+    at __TURBOPACK__module__evaluation__ (lib/supabase/client.ts:22:43)
+    at __TURBOPACK__module__evaluation__ (app/dashboard/page.tsx:11:1)
+  20 |  * Used in API routes and server-side operations
+  21 |  */
+> 22 | export const supabaseServer = createClient(supabaseUrl, supabaseServiceKey, {
+     |                                           ^
+  23 |   auth: {
+  24 |     autoRefreshToken: false,
+  25 |     persistSession: false, {
+  digest: '2274803719'
+}
+ GET /dashboard 500 in 5725ms
+ ⚠ Cross origin request detected from whatsapp-sales-agent-2.lindy.site to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
+Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
+ GET /dashboard 200 in 142ms
+ ○ Compiling /favicon.ico ...
+ ✓ Compiled /favicon.ico in 553ms
+ GET /favicon.ico 200 in 891ms
+ ✓ Compiled in 344ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⚠ Fast Refresh had to perform a full reload when ./app/dashboard/page.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⚠ Fast Refresh had to perform a full reload when ./app/dashboard/page.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⚠ Fast Refresh had to perform a full reload when ./app/dashboard/page.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⚠ Fast Refresh had to perform a full reload when ./app/dashboard/page.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /dashboard 200 in 530ms
+ GET /dashboard 200 in 389ms
+ GET /dashboard 200 in 534ms
+ GET /favicon.ico?favicon.bf3c9292.ico 200 in 326ms
+ GET /dashboard 200 in 220ms
+ GET /favicon.ico?favicon.bf3c9292.ico 200 in 300ms
+ GET /dashboard 200 in 243ms
+ GET /favicon.ico?favicon.bf3c9292.ico 200 in 264ms
+ GET /dashboard?tab=products 200 in 95ms
+ GET /dashboard?tab=products 200 in 94ms
+ GET /dashboard?tab=products 200 in 92ms
+ GET /dashboard?tab=customers 200 in 98ms
+ GET /dashboard?tab=customers 200 in 93ms
+ GET /dashboard?tab=customers 200 in 78ms
+ GET /dashboard?tab=conversations 200 in 84ms
+ GET /dashboard?tab=conversations 200 in 86ms
+ GET /dashboard 200 in 102ms
+ GET /dashboard 200 in 86ms
+ GET /dashboard?tab=products 200 in 89ms
+ GET /dashboard?tab=products 200 in 88ms
+ GET /dashboard?tab=customers 200 in 86ms
+ GET /dashboard?tab=products 200 in 116ms
+ GET /dashboard?tab=products 200 in 74ms
+ GET /dashboard?tab=conversations 200 in 80ms
+ GET /dashboard 200 in 85ms
+ GET /dashboard?tab=customers 200 in 76ms
+ GET /dashboard?tab=products 200 in 106ms
+ GET /dashboard?tab=customers 200 in 103ms
+ GET /dashboard?tab=products 200 in 89ms
+ GET /dashboard?tab=customers 200 in 103ms
+ GET /dashboard?tab=conversations 200 in 113ms
+ GET /dashboard?tab=conversations 200 in 90ms
+ GET /dashboard?tab=conversations 200 in 110ms
+ GET /dashboard 200 in 86ms
+ GET /dashboard?tab=conversations 200 in 89ms
+ GET /dashboard?tab=customers 200 in 102ms
+ GET /dashboard?tab=products 200 in 95ms
+ GET /dashboard 200 in 241ms
+ ✓ Compiled in 327ms
+ ✓ Compiled in 168ms
+ ✓ Compiled in 181ms
+ ⨯ Error: supabaseUrl is required.
+    at __TURBOPACK__module__evaluation__ (lib/supabase/client.ts:22:43)
+    at __TURBOPACK__module__evaluation__ (components/dashboard/ConversationsList.tsx:12:1)
+    at __TURBOPACK__module__evaluation__ (app/dashboard/page.tsx:16:1)
+  20 |  * Used in API routes and server-side operations
+  21 |  */
+> 22 | export const supabaseServer = createClient(supabaseUrl, supabaseServiceKey, {
+     |                                           ^
+  23 |   auth: {
+  24 |     autoRefreshToken: false,
+  25 |     persistSession: false, {
+  digest: '2274803719'
+}
+ GET /dashboard 500 in 1058ms
+ GET /favicon.ico 200 in 339ms
+ GET /dashboard?tab=conversations 200 in 110ms
+ GET /dashboard?tab=conversations 200 in 100ms
+ GET /dashboard?tab=products 200 in 92ms
+ GET /dashboard?tab=products 200 in 94ms
+ GET /dashboard?tab=products 200 in 86ms
+ GET /dashboard?tab=products 200 in 92ms
+ GET /dashboard?tab=products 200 in 95ms
+ GET /dashboard?tab=products 200 in 84ms
+ ✓ Compiled in 149ms
+ ✓ Compiled in 256ms
+ ✓ Compiled in 151ms
+ ✓ Compiled in 151ms
+ ✓ Compiled in 224ms
+ GET /dashboard 200 in 681ms
+ GET /favicon.ico?favicon.bf3c9292.ico 200 in 290ms
+ GET /dashboard?tab=conversations 200 in 117ms
+ GET /dashboard?tab=customers 200 in 103ms
+ GET /dashboard?tab=customers 200 in 97ms
+ GET /dashboard?tab=products 200 in 94ms
+ GET /dashboard?tab=products 200 in 85ms
+ GET /dashboard?tab=products 200 in 88ms
+ GET /dashboard 200 in 230ms
+ GET /dashboard?tab=conversations 200 in 101ms
+ GET /dashboard?tab=customers 200 in 101ms
+ GET /dashboard?tab=products 200 in 85ms
+ GET /dashboard?tab=products 200 in 118ms
+ GET /dashboard?tab=customers 200 in 80ms
+ GET /dashboard?tab=conversations 200 in 85ms
+ GET /dashboard?tab=conversations 200 in 87ms
+ GET /dashboard?tab=products 200 in 83ms
+ GET /dashboard?tab=products 200 in 105ms
+ GET /dashboard?tab=products 200 in 115ms
+ GET /dashboard?tab=products 200 in 93ms
+ GET /dashboard?tab=products 200 in 81ms
+ GET /dashboard 200 in 93ms
+ GET /dashboard 200 in 255ms
+ GET /dashboard?tab=products 200 in 380ms
+ GET /dashboard?tab=customers 200 in 464ms
+ GET /dashboard?tab=conversations 200 in 158ms
+ GET /dashboard?tab=products 200 in 95ms
+ GET /dashboard?tab=conversations 200 in 104ms
+ GET /dashboard 200 in 214ms
+ GET /dashboard?tab=conversations 200 in 107ms
+ GET /dashboard?tab=conversations 200 in 99ms
+ GET /dashboard?tab=conversations 200 in 86ms
+ GET /dashboard?tab=conversations 200 in 98ms
+ GET /dashboard?tab=conversations 200 in 101ms
+ ✓ Compiled in 229ms
+ ✓ Compiled in 107ms
+ ✓ Compiled in 171ms
+ GET /dashboard?tab=products 200 in 814ms
+ GET /favicon.ico?favicon.bf3c9292.ico 200 in 321ms
+ GET /dashboard 200 in 253ms
+ GET /dashboard?tab=conversations 200 in 105ms
+ GET /dashboard?tab=customers 200 in 95ms
+ GET /dashboard?tab=customers 200 in 106ms
+ GET /dashboard?tab=customers 200 in 94ms
+ GET /dashboard?tab=customers 200 in 96ms
+ GET /dashboard?tab=products 200 in 92ms
+ GET /dashboard?tab=products 200 in 94ms
+ GET /dashboard?tab=products 200 in 127ms
+ GET /dashboard?tab=products 200 in 87ms
+ GET /dashboard?tab=products 200 in 153ms
+ GET /dashboard?tab=customers 200 in 148ms
+ GET /dashboard?tab=products 200 in 125ms
+ GET /dashboard?tab=customers 200 in 144ms
+ GET /dashboard?tab=customers 200 in 96ms
+ GET /dashboard?tab=customers 200 in 303ms
+ GET /favicon.ico?favicon.bf3c9292.ico 200 in 278ms
+ GET /dashboard?tab=conversations 200 in 112ms
+ GET /dashboard?tab=conversations 200 in 98ms
+ GET /dashboard?tab=conversations 200 in 109ms
+ GET /dashboard?tab=customers 200 in 99ms
+ GET /dashboard?tab=customers 200 in 119ms
+ GET /dashboard?tab=customers 200 in 106ms
+ GET /dashboard?tab=products 200 in 122ms
+ GET /dashboard?tab=products 200 in 132ms
+ GET /dashboard?tab=customers 200 in 118ms
+ GET /dashboard?tab=products 200 in 109ms
+ GET /dashboard?tab=customers 200 in 99ms
+ GET /dashboard?tab=customers 200 in 100ms
+ GET /dashboard?tab=customers 200 in 107ms
+ GET /dashboard?tab=conversations 200 in 114ms
+ GET /dashboard?tab=conversations 200 in 108ms
+ GET /dashboard?tab=conversations 200 in 99ms
+ GET /dashboard?tab=products 200 in 137ms
+ GET /dashboard?tab=products 200 in 151ms
+ GET /dashboard?tab=products 200 in 113ms
+ GET /dashboard?tab=customers 200 in 92ms
+ GET /dashboard 200 in 141ms
+ GET /dashboard?tab=conversations 200 in 101ms
+ GET /dashboard?tab=conversations 200 in 99ms
+ GET /dashboard?tab=conversations 200 in 97ms
+ GET /dashboard?tab=customers 200 in 82ms
+ GET /dashboard?tab=customers 200 in 121ms
+ GET /dashboard?tab=customers 200 in 112ms
+ GET /dashboard?tab=products 200 in 102ms
+ GET /dashboard?tab=products 200 in 130ms
+ GET /dashboard?tab=conversations 200 in 99ms
+ GET /dashboard?tab=conversations 200 in 89ms
+ GET /dashboard?tab=conversations 200 in 95ms
+ GET /dashboard?tab=conversations 200 in 91ms
+ GET /dashboard?tab=conversations 200 in 97ms
+ GET /dashboard?tab=customers 200 in 87ms
+ GET /dashboard?tab=customers 200 in 96ms
+ GET /dashboard?tab=customers 200 in 86ms
+ GET /dashboard?tab=products 200 in 89ms
+ GET /dashboard?tab=products 200 in 101ms
+ GET /dashboard?tab=products 200 in 89ms
+ GET /dashboard?tab=customers 200 in 102ms
+ GET /dashboard 200 in 219ms
+ GET /dashboard?tab=customers 200 in 221ms
+ GET /dashboard?tab=customers 200 in 225ms
+ GET /dashboard?tab=products 200 in 196ms
+ GET /dashboard?tab=products 200 in 199ms
+ GET /dashboard?tab=products 200 in 195ms
+ GET /dashboard?tab=customers 200 in 137ms
+ GET /dashboard?tab=customers 200 in 97ms
+ GET /dashboard?tab=customers 200 in 91ms
+ GET /dashboard?tab=customers 200 in 88ms
+ GET /dashboard?tab=customers 200 in 91ms
+ GET /dashboard?tab=customers 200 in 455ms
+ GET /favicon.ico?favicon.bf3c9292.ico 200 in 299ms
+ GET /dashboard?tab=conversations 200 in 110ms
+ GET /dashboard?tab=conversations 200 in 105ms
+ GET /dashboard?tab=conversations 200 in 102ms
+ GET /dashboard?tab=conversations 200 in 99ms
+ GET /dashboard?tab=conversations 200 in 115ms
+ GET /dashboard?tab=customers 200 in 103ms
+ GET /dashboard?tab=customers 200 in 106ms
+ GET /dashboard?tab=customers 200 in 90ms
+ GET /dashboard?tab=products 200 in 102ms
+ GET /dashboard?tab=products 200 in 272ms
+ GET /dashboard?tab=products 200 in 112ms
+ GET /dashboard?tab=products 200 in 217ms
+ GET /dashboard?tab=products 200 in 121ms
+ GET /dashboard?tab=products 200 in 313ms
+ GET /dashboard?tab=products 200 in 119ms
+ ✓ Compiled in 114ms
+ ✓ Compiled /dashboard in 43ms
+ GET /dashboard?tab=products 200 in 275ms
+ GET /dashboard?tab=customers 200 in 535ms
+ GET /favicon.ico?favicon.bf3c9292.ico 200 in 329ms
+ ○ Compiling /dashboard/conversations ...
+ ✓ Compiled /dashboard/conversations in 629ms
+ GET /dashboard/conversations 200 in 719ms
+ ○ Compiling /dashboard/customers ...
+ ✓ Compiled /dashboard/customers in 505ms
+ GET /dashboard/customers 200 in 586ms
+ ✓ Compiled /dashboard/products in 498ms
+ GET /dashboard/products 200 in 597ms
+ GET /dashboard?tab=products 200 in 257ms
+ GET /favicon.ico?favicon.bf3c9292.ico 200 in 282ms
+ GET /dashboard/conversations 200 in 97ms
+ GET /dashboard/customers 200 in 93ms
+ GET /dashboard/products 200 in 117ms
+ GET /dashboard 200 in 118ms
