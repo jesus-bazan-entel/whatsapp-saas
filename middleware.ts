@@ -29,35 +29,53 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  const response = NextResponse.next()
+  // Check if Supabase is configured
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => {
-            response.cookies.set(name, value)
-          })
-        },
-      },
-    }
-  )
-
-  const { data } = await supabase.auth.getUser()
-
-  if (!data?.user) {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    // Supabase not configured - redirect to login with error
     const url = request.nextUrl.clone()
     url.pathname = '/auth/login'
-    url.searchParams.set('redirectTo', pathname)
     return NextResponse.redirect(url)
   }
 
-  return response
+  const response = NextResponse.next()
+
+  try {
+    const supabase = createServerClient(
+      supabaseUrl,
+      supabaseAnonKey,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll()
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) => {
+              response.cookies.set(name, value)
+            })
+          },
+        },
+      }
+    )
+
+    const { data } = await supabase.auth.getUser()
+
+    if (!data?.user) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/auth/login'
+      url.searchParams.set('redirectTo', pathname)
+      return NextResponse.redirect(url)
+    }
+
+    return response
+  } catch (error) {
+    console.error('Middleware error:', error)
+    const url = request.nextUrl.clone()
+    url.pathname = '/auth/login'
+    return NextResponse.redirect(url)
+  }
 }
 
 export const config = {
