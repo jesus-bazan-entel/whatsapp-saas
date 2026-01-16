@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS organizations (
   max_products INT DEFAULT 50,
   max_team_members INT DEFAULT 5,
   whatsapp_phone_number TEXT,
+  whatsapp_phone_number_id TEXT UNIQUE, -- Added for webhook mapping
   whatsapp_configured BOOLEAN DEFAULT false,
   gemini_configured BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -172,6 +173,7 @@ CREATE TABLE IF NOT EXISTS activity_logs (
 -- Organization indexes
 CREATE INDEX IF NOT EXISTS idx_organizations_slug ON organizations(slug);
 CREATE INDEX IF NOT EXISTS idx_organizations_subscription_status ON organizations(subscription_status);
+CREATE INDEX IF NOT EXISTS idx_organizations_whatsapp_phone_id ON organizations(whatsapp_phone_number_id); -- Added for webhook lookup
 
 -- Team member indexes
 CREATE INDEX IF NOT EXISTS idx_team_members_organization ON team_members(organization_id);

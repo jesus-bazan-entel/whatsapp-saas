@@ -1,23 +1,26 @@
 /**
- * WhatsApp Webhook Endpoint
- * 
- * This endpoint receives incoming messages and status updates from WhatsApp Business API.
- * It processes messages, stores them in Supabase, and generates AI responses.
- * 
+ * WhatsApp Webhook Endpoint (Multi-tenant)
+ *
+ * This endpoint receives incoming messages from WhatsApp Cloud API.
+ *
+ * Multi-tenant strategy (Option A): 1 WhatsApp number per customer (organization).
+ * We identify the tenant by `value.metadata.phone_number_id` present in the webhook payload.
+ *
  * GET: Webhook verification from WhatsApp
  * POST: Incoming messages and events
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { parseWhatsAppWebhook, verifyWebhookToken, sendWhatsAppMessage, markMessageAsRead } from '@/lib/whatsapp/client'
+import {
+  parseWhatsAppWebhook,
+  verifyWebhookToken,
+  sendWhatsAppMessage,
+  markMessageAsReadForTenant,
+} from '@/lib/whatsapp/client'
 import { supabaseServer } from '@/lib/supabase/client'
 import { generateAIResponse, analyzeMessage } from '@/lib/gemini/client'
+import { resolveTenantByPhoneNumberId } from '@/lib/whatsapp/tenant'
 
-/**
- * GET handler for webhook verification
- * WhatsApp sends a verification request with a token and challenge
- * We must respond with the challenge if the token matches
- */
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
@@ -25,7 +28,6 @@ export async function GET(request: NextRequest) {
     const token = searchParams.get('hub.verify_token')
     const challenge = searchParams.get('hub.challenge')
 
-    // Verify the webhook token
     if (mode === 'subscribe' && token && verifyWebhookToken(token)) {
       console.log('✅ Webhook verified successfully')
       return new NextResponse(challenge, { status: 200 })
@@ -39,49 +41,65 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/**
- * POST handler for incoming messages and events
- * Processes incoming WhatsApp messages and generates AI responses
- */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    // Parse the incoming webhook
     const parsedMessage = parseWhatsAppWebhook(body)
 
-    // If not a message event, acknowledge and return
+    // Not a message event
     if (!parsedMessage) {
-      console.log('Received non-message event, acknowledging')
       return new NextResponse('OK', { status: 200 })
     }
 
-    const { messageId, fromPhoneNumber, messageText, timestamp, type } = parsedMessage
+    const { messageId, fromPhoneNumber, messageText, type, phoneNumberId } = parsedMessage
 
-    console.log(`📨 Received message from ${fromPhoneNumber}: ${messageText}`)
+    console.log(
+      `📨 Incoming message | phone_number_id=${phoneNumberId} | from=${fromPhoneNumber} | text=${messageText}`
+    )
 
-    // Mark message as read
+    // 1) Resolve tenant (organization) by WhatsApp phone_number_id
+    const tenant = await resolveTenantByPhoneNumberId(phoneNumberId)
+    if (!tenant) {
+      // IMPORTANT: we still ACK to avoid retries; but we log loudly.
+      console.error(
+        `❌ No organization mapped for phone_number_id=${phoneNumberId}. Configure organizations.whatsapp_phone_number_id.`
+      )
+      return new NextResponse('OK', { status: 200 })
+    }
+
+    const organizationId = tenant.organizationId
+
+    // 2) Mark message as read (best-effort)
     try {
-      await markMessageAsRead(messageId)
+      const accessToken = process.env.WHATSAPP_ACCESS_TOKEN
+      if (accessToken) {
+        await markMessageAsReadForTenant(messageId, {
+          phoneNumberId: tenant.phoneNumberId,
+          accessToken,
+        })
+      }
     } catch (error) {
       console.error('Error marking message as read:', error)
     }
 
-    // Step 1: Get or create customer
+    // 3) Get or create customer (scoped by organization)
     let customer = await supabaseServer
       .from('customers')
       .select('*')
+      .eq('organization_id', organizationId)
       .eq('phone_number', fromPhoneNumber)
       .single()
 
     if (customer.error) {
-      // Customer doesn't exist, create new one
       const createResult = await supabaseServer
         .from('customers')
         .insert({
+          organization_id: organizationId,
           phone_number: fromPhoneNumber,
           name: `Customer ${fromPhoneNumber}`,
           status: 'prospect',
+          source: 'whatsapp',
         })
         .select()
         .single()
@@ -95,10 +113,11 @@ export async function POST(request: NextRequest) {
 
     const customerId = customer.data.id
 
-    // Step 2: Get or create conversation
+    // 4) Get or create active conversation (scoped by organization)
     let conversation = await supabaseServer
       .from('conversations')
       .select('*')
+      .eq('organization_id', organizationId)
       .eq('customer_id', customerId)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
@@ -106,13 +125,14 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (conversation.error) {
-      // No active conversation, create new one
       const createConvResult = await supabaseServer
         .from('conversations')
         .insert({
+          organization_id: organizationId,
           customer_id: customerId,
           title: `Chat with ${customer.data.name}`,
           status: 'active',
+          last_message_at: new Date().toISOString(),
         })
         .select()
         .single()
@@ -122,79 +142,93 @@ export async function POST(request: NextRequest) {
       }
 
       conversation = createConvResult
+    } else {
+      // Update last_message_at
+      await supabaseServer
+        .from('conversations')
+        .update({ last_message_at: new Date().toISOString() })
+        .eq('id', conversation.data.id)
     }
 
     const conversationId = conversation.data.id
 
-    // Step 3: Store the incoming message
+    // 5) Store incoming message (scoped by organization)
     await supabaseServer.from('messages').insert({
+      organization_id: organizationId,
       conversation_id: conversationId,
       sender_type: 'customer',
       content: messageText,
       message_type: type,
+      whatsapp_message_id: messageId,
+      metadata: {
+        whatsapp_phone_number_id: phoneNumberId,
+      },
     })
 
-    // Step 4: Analyze message sentiment and intent
+    // 6) AI analysis & context
     const analysis = await analyzeMessage(messageText)
-    console.log(`📊 Message analysis:`, analysis)
 
-    // Step 5: Get conversation history for context
     const { data: messageHistory } = await supabaseServer
       .from('messages')
       .select('*')
+      .eq('organization_id', organizationId)
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: true })
       .limit(10)
 
-    const conversationContext = messageHistory?.map((msg) => ({
-      role: msg.sender_type === 'customer' ? 'customer' : 'agent',
-      content: msg.content,
-    })) || []
+    const conversationContext =
+      messageHistory?.map((msg) => ({
+        role: msg.sender_type === 'customer' ? 'customer' : 'agent',
+        content: msg.content,
+      })) || []
 
-    // Step 6: Get available products for recommendations
     const { data: products } = await supabaseServer
       .from('products')
       .select('*')
+      .eq('organization_id', organizationId)
       .limit(10)
 
-    // Step 7: Generate AI response
-    const aiResponse = await generateAIResponse(
-      messageText,
-      conversationContext,
-      products || []
-    )
+    // 7) Generate AI response
+    const aiResponse = await generateAIResponse(messageText, conversationContext, products || [])
 
-    console.log(`🤖 AI Response: ${aiResponse}`)
-
-    // Step 8: Store the AI response
+    // 8) Store AI response
     await supabaseServer.from('messages').insert({
+      organization_id: organizationId,
       conversation_id: conversationId,
       sender_type: 'agent',
       content: aiResponse,
       message_type: 'text',
+      metadata: {
+        intent: analysis.intent,
+        sentiment: analysis.sentiment,
+        confidence: analysis.confidence,
+      },
     })
 
-    // Step 9: Send response via WhatsApp
+    // 9) Send response back via WhatsApp (using tenant phone_number_id)
     try {
-      await sendWhatsAppMessage(fromPhoneNumber, aiResponse)
-      console.log(`✅ Message sent to ${fromPhoneNumber}`)
+      const accessToken = process.env.WHATSAPP_ACCESS_TOKEN
+      await sendWhatsAppMessage(fromPhoneNumber, aiResponse, {
+        phoneNumberId: tenant.phoneNumberId,
+        accessToken: accessToken || undefined,
+      })
     } catch (error) {
       console.error('Error sending WhatsApp message:', error)
     }
 
-    // Step 10: Update customer status based on analysis
+    // 10) Optional: promote prospect to customer
     if (analysis.intent === 'purchase') {
       await supabaseServer
         .from('customers')
         .update({ status: 'customer' })
+        .eq('organization_id', organizationId)
         .eq('id', customerId)
     }
 
-    // Acknowledge the webhook
     return new NextResponse('OK', { status: 200 })
   } catch (error) {
     console.error('Error processing webhook:', error)
-    // Always return 200 to acknowledge the webhook, even on error
+    // Always ACK to prevent retries storms
     return new NextResponse('OK', { status: 200 })
   }
 }

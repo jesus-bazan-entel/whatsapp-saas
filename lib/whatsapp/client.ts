@@ -16,15 +16,20 @@ const WHATSAPP_API_URL = 'https://graph.facebook.com'
  * 
  * @param toPhoneNumber - Recipient phone number (with country code, no +)
  * @param messageText - The message content to send
+ * @param opts - Optional overrides for multi-tenant (phoneNumberId, accessToken)
  * @returns Response from WhatsApp API
  */
 export async function sendWhatsAppMessage(
   toPhoneNumber: string,
-  messageText: string
-): Promise<any> {
+  messageText: string,
+  opts?: {
+    phoneNumberId?: string
+    accessToken?: string
+  }
+): Promise<unknown> {
   try {
-    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
-    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN
+    const phoneNumberId = opts?.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID
+    const accessToken = opts?.accessToken || process.env.WHATSAPP_ACCESS_TOKEN
 
     if (!phoneNumberId || !accessToken) {
       throw new Error('WhatsApp credentials not configured')
@@ -78,7 +83,7 @@ export async function sendWhatsAppTemplate(
   templateName: string,
   templateLanguage: string = 'en',
   parameters: string[] = []
-): Promise<any> {
+): Promise<unknown> {
   try {
     const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
     const accessToken = process.env.WHATSAPP_ACCESS_TOKEN
@@ -142,6 +147,7 @@ export function parseWhatsAppWebhook(body: any): {
   messageText: string
   timestamp: number
   type: 'text' | 'image' | 'document' | 'audio' | 'video' | 'location' | 'unknown'
+  phoneNumberId?: string
 } | null {
   try {
     // Navigate through the webhook structure
@@ -156,6 +162,9 @@ export function parseWhatsAppWebhook(body: any): {
 
     const message = value.messages[0]
     const contact = value.contacts?.[0]
+    
+    // Extract the phone_number_id that received the message (critical for multi-tenant)
+    const phoneNumberId = value?.metadata?.phone_number_id
 
     if (!message || !contact) {
       return null
@@ -192,6 +201,7 @@ export function parseWhatsAppWebhook(body: any): {
       messageText,
       timestamp: message.timestamp,
       type: messageType,
+      phoneNumberId,
     }
   } catch (error) {
     console.error('Error parsing WhatsApp webhook:', error)
@@ -217,7 +227,7 @@ export function verifyWebhookToken(token: string): boolean {
  * @param messageId - The ID of the message to mark as read
  * @returns Response from WhatsApp API
  */
-export async function markMessageAsRead(messageId: string): Promise<any> {
+export async function markMessageAsRead(messageId: string): Promise<unknown> {
   try {
     const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
     const accessToken = process.env.WHATSAPP_ACCESS_TOKEN
@@ -253,4 +263,42 @@ export async function markMessageAsRead(messageId: string): Promise<any> {
     console.error('Error marking message as read:', error)
     throw error
   }
+}
+
+/**
+ * Mark a message as read for a specific tenant
+ * 
+ * @param messageId - The ID of the message to mark as read
+ * @param opts - Tenant credentials (phoneNumberId, accessToken)
+ * @returns Response from WhatsApp API
+ */
+export async function markMessageAsReadForTenant(
+  messageId: string,
+  opts: { phoneNumberId: string; accessToken: string }
+): Promise<unknown> {
+  const { phoneNumberId, accessToken } = opts
+  if (!phoneNumberId || !accessToken) throw new Error('WhatsApp tenant credentials not configured')
+
+  const url = `${WHATSAPP_API_URL}/${WHATSAPP_API_VERSION}/${phoneNumberId}/messages`
+  const payload = {
+    messaging_product: 'whatsapp',
+    status: 'read',
+    message_id: messageId,
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(`WhatsApp API error: ${error.error?.message}`)
+  }
+
+  return await response.json()
 }

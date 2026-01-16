@@ -1,0 +1,35 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "WHATSAPP_BUSINESS_ACCOUNT_ID",
+      "changes": [
+        {
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "15551234567",
+              "phone_number_id": "TEST_PHONE_NUMBER_ID"
+            },
+            "contacts": [
+              {
+                "profile": { "name": "Test Customer" },
+                "wa_id": "51999999999"
+              }
+            ],
+            "messages": [
+              {
+                "from": "51999999999",
+                "id": "wamid.TEST_MESSAGE_ID",
+                "timestamp": "1700000000",
+                "type": "text",
+                "text": { "body": "Hola, quiero saber el precio" }
+              }
+            ]
+          },
+          "field": "messages"
+        }
+      ]
+    }
+  ]
+}
