@@ -111,7 +111,7 @@ export default function OnboardingPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
         {/* Left: Steps */}
         <div className="space-y-6">
-          <Tabs value={activeStep} onValueChange={(v) => setActiveStep(v as any)} className="space-y-4">
+          <Tabs value={activeStep} onValueChange={(v) => setActiveStep(v as "step1" | "step2" | "step3" | "step4")} className="space-y-4">
             <TabsList className="grid grid-cols-4 w-full">
               <TabsTrigger value="step1" className="gap-2">
                 <Database className="h-4 w-4" />

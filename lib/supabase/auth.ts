@@ -226,7 +226,7 @@ export async function logActivity(
   entityType: string,
   entityId: string,
   action: string,
-  changes?: Record<string, any>
+  changes?: Record<string, unknown>
 ) {
   try {
     await supabaseServer.from('activity_logs').insert({
