@@ -11,6 +11,13 @@
 const WHATSAPP_API_VERSION = 'v19.0'
 const WHATSAPP_API_URL = 'https://graph.facebook.com'
 
+// WhatsApp API response type for send message
+interface WhatsAppSendMessageResponse {
+  messaging_product: string
+  contacts?: Array<{ input: string; wa_id: string }>
+  messages?: Array<{ id: string }>
+}
+
 /**
  * Send a text message via WhatsApp Business API
  * 
@@ -26,7 +33,7 @@ export async function sendWhatsAppMessage(
     phoneNumberId?: string
     accessToken?: string
   }
-): Promise<unknown> {
+): Promise<WhatsAppSendMessageResponse> {
   try {
     const phoneNumberId = opts?.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID
     const accessToken = opts?.accessToken || process.env.WHATSAPP_ACCESS_TOKEN
