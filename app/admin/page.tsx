@@ -15,7 +15,6 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Building2, Users, CreditCard, Settings, Plus, Search } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -32,7 +31,7 @@ interface Organization {
 }
 
 export default function AdminDashboard() {
-  const [organizations, setOrganizations] = useState<Organization[]>([])
+  const [organizations] = useState<Organization[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [isCreateOpen, setIsCreateOpen] = useState(false)

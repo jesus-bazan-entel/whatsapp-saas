@@ -5,15 +5,15 @@
  * Only accessible to super admin (you)
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/client'
-import { createOrganization, addTeamMember } from '@/lib/supabase/auth'
+import { createOrganization } from '@/lib/supabase/auth'
 
 /**
  * GET /api/admin/organizations
  * List all organizations
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // TODO: Add admin authentication check
     
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
  * POST /api/admin/organizations
  * Create new organization
  */
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     // TODO: Add admin authentication check
     

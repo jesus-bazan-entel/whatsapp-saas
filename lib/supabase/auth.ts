@@ -4,7 +4,7 @@
  * Handles user authentication, organization management, and multi-tenant isolation
  */
 
-import { supabaseServer, supabaseClient } from './client'
+import { supabaseServer } from './client'
 
 /**
  * Get current user's organization
