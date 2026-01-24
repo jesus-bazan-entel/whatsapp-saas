@@ -16,10 +16,18 @@ import {
   verifyWebhookToken,
   sendWhatsAppMessage,
   markMessageAsReadForTenant,
+  getWhatsAppMediaUrl,
+  downloadWhatsAppMedia,
 } from '@/lib/whatsapp/client'
 import { supabaseServer } from '@/lib/supabase/client'
-import { generateAIResponse, analyzeMessage } from '@/lib/gemini/client'
+import { analyzeMessage, analyzePaymentReceipt } from '@/lib/gemini/client'
 import { resolveTenantByPhoneNumberId } from '@/lib/whatsapp/tenant'
+import {
+  createSalesSystemPrompt,
+  isCartCommand,
+  handleCartCommand,
+  getEnrichedProducts,
+} from '@/lib/sales-bot'
 
 export async function GET(request: NextRequest) {
   try {
@@ -52,10 +60,11 @@ export async function POST(request: NextRequest) {
       return new NextResponse('OK', { status: 200 })
     }
 
-    const { messageId, fromPhoneNumber, messageText, type, phoneNumberId } = parsedMessage
+    const { messageId, fromPhoneNumber, messageText, type, phoneNumberId, mediaId, mimeType } =
+      parsedMessage
 
     console.log(
-      `📨 Incoming message | phone_number_id=${phoneNumberId} | from=${fromPhoneNumber} | text=${messageText}`
+      `📨 Incoming message | phone_number_id=${phoneNumberId} | from=${fromPhoneNumber} | type=${type} | text=${messageText}`
     )
 
     // 1) Resolve tenant (organization) by WhatsApp phone_number_id
@@ -152,7 +161,83 @@ export async function POST(request: NextRequest) {
 
     const conversationId = conversation.data.id
 
-    // 5) Store incoming message (scoped by organization)
+    // 5) Check if this is an image (potential payment receipt)
+    if (type === 'image' && mediaId) {
+      console.log('📸 Image received, checking for payment receipt...')
+
+      // Check if customer has a pending payment
+      const { data: pendingPayment } = await supabaseServer
+        .from('payment_transactions')
+        .select('*')
+        .eq('customer_id', customerId)
+        .eq('organization_id', organizationId)
+        .in('status', ['pending', 'processing'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (pendingPayment) {
+        // Process payment receipt
+        console.log('💳 Processing payment receipt for transaction:', pendingPayment.id)
+
+        try {
+          const accessToken = process.env.WHATSAPP_ACCESS_TOKEN || ''
+
+          // Download the image from WhatsApp
+          const mediaUrl = await getWhatsAppMediaUrl(mediaId, accessToken)
+          const imageBase64 = await downloadWhatsAppMedia(mediaUrl, accessToken)
+
+          // Analyze the receipt with Gemini Vision
+          const receiptAnalysis = await analyzePaymentReceipt(
+            `data:${mimeType || 'image/jpeg'};base64,${imageBase64}`,
+            pendingPayment.amount
+          )
+
+          // Store receipt (use media URL for reference)
+          await supabaseServer.from('payment_receipts').insert({
+            organization_id: organizationId,
+            payment_transaction_id: pendingPayment.id,
+            image_url: mediaUrl,
+            image_type: receiptAnalysis.paymentMethod || 'other',
+            ai_analysis: receiptAnalysis as unknown as Record<string, unknown>,
+            ai_confidence: receiptAnalysis.confidence,
+            extracted_amount: receiptAnalysis.extractedAmount,
+            extracted_date: receiptAnalysis.extractedDate,
+            extracted_reference: receiptAnalysis.extractedReference,
+            is_verified: false,
+          })
+
+          // Update payment status
+          if (receiptAnalysis.isValid && receiptAnalysis.confidence >= 0.7) {
+            await supabaseServer
+              .from('payment_transactions')
+              .update({ status: 'processing' })
+              .eq('id', pendingPayment.id)
+
+            const response = `✅ ¡Recibimos tu comprobante de pago!\n\n📊 **Análisis:**\n- Monto detectado: S/ ${receiptAnalysis.extractedAmount}\n- Referencia: ${receiptAnalysis.extractedReference || 'N/A'}\n- Confianza: ${Math.round(receiptAnalysis.confidence * 100)}%\n\nTu pago está en verificación. Te confirmaremos en breve. ⏳`
+
+            await sendWhatsAppMessage(fromPhoneNumber, response, {
+              phoneNumberId: tenant.phoneNumberId,
+              accessToken,
+            })
+          } else {
+            const warnings = receiptAnalysis.warnings.join('\n- ')
+            const response = `⚠️ Recibimos tu comprobante, pero hay algunos detalles que revisar:\n\n${warnings}\n\nNuestro equipo lo verificará manualmente. Te confirmaremos pronto.`
+
+            await sendWhatsAppMessage(fromPhoneNumber, response, {
+              phoneNumberId: tenant.phoneNumberId,
+              accessToken,
+            })
+          }
+
+          return new NextResponse('OK', { status: 200 })
+        } catch (error) {
+          console.error('Error processing payment receipt:', error)
+        }
+      }
+    }
+
+    // 6) Store incoming message (scoped by organization)
     await supabaseServer.from('messages').insert({
       organization_id: organizationId,
       conversation_id: conversationId,
@@ -162,50 +247,87 @@ export async function POST(request: NextRequest) {
       whatsapp_message_id: messageId,
       metadata: {
         whatsapp_phone_number_id: phoneNumberId,
+        media_id: mediaId,
+        mime_type: mimeType,
       },
     })
 
-    // 6) AI analysis & context
-    const analysis = await analyzeMessage(messageText)
+    // 7) Check if this is a cart command
+    const cartCommandCheck = isCartCommand(messageText)
 
-    const { data: messageHistory } = await supabaseServer
-      .from('messages')
-      .select('*')
-      .eq('organization_id', organizationId)
-      .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: true })
-      .limit(10)
+    let aiResponse: string
 
-    const conversationContext =
-      messageHistory?.map((msg) => ({
-        role: msg.sender_type === 'customer' ? 'customer' : 'agent',
-        content: msg.content,
-      })) || []
+    if (cartCommandCheck.isCommand && cartCommandCheck.command) {
+      console.log('🛒 Cart command detected:', cartCommandCheck.command)
 
-    const { data: products } = await supabaseServer
-      .from('products')
-      .select('*')
-      .eq('organization_id', organizationId)
-      .limit(10)
+      // Handle cart command
+      aiResponse = await handleCartCommand(
+        cartCommandCheck.command,
+        organizationId,
+        customerId,
+        cartCommandCheck.productQuery
+      )
+    } else {
+      // 8) AI analysis & context
+      const analysis = await analyzeMessage(messageText)
 
-    // 7) Generate AI response
-    const aiResponse = await generateAIResponse(messageText, conversationContext, products || [])
+      const { data: messageHistory } = await supabaseServer
+        .from('messages')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true })
+        .limit(10)
 
-    // 8) Store AI response
+      const conversationContext =
+        messageHistory?.map((msg) => ({
+          role: msg.sender_type === 'customer' ? 'customer' : 'agent',
+          content: msg.content,
+        })) || []
+
+      // Get enriched products with variants and features
+      const products = await getEnrichedProducts(organizationId)
+
+      // Get enhanced system prompt with all sales info
+      const systemPrompt = await createSalesSystemPrompt(organizationId)
+
+      // 9) Generate AI response with sales context
+      const { GoogleGenerativeAI } = await import('@google/generative-ai')
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+
+      const chat = model.startChat({
+        history: conversationContext.map((msg) => ({
+          role: msg.role === 'customer' ? 'user' : 'model',
+          parts: [{ text: msg.content }],
+        })),
+        systemInstruction: systemPrompt,
+      })
+
+      const result = await chat.sendMessage(messageText)
+      aiResponse = result.response.text()
+
+      // 10) Optional: promote prospect to customer
+      if (analysis.intent === 'purchase') {
+        await supabaseServer
+          .from('customers')
+          .update({ status: 'customer' })
+          .eq('organization_id', organizationId)
+          .eq('id', customerId)
+      }
+    }
+
+    // 11) Store AI response
     await supabaseServer.from('messages').insert({
       organization_id: organizationId,
       conversation_id: conversationId,
       sender_type: 'agent',
       content: aiResponse,
       message_type: 'text',
-      metadata: {
-        intent: analysis.intent,
-        sentiment: analysis.sentiment,
-        confidence: analysis.confidence,
-      },
+      metadata: {},
     })
 
-    // 9) Send response back via WhatsApp (using tenant phone_number_id)
+    // 12) Send response back via WhatsApp (using tenant phone_number_id)
     try {
       const accessToken = process.env.WHATSAPP_ACCESS_TOKEN
       await sendWhatsAppMessage(fromPhoneNumber, aiResponse, {
@@ -214,15 +336,6 @@ export async function POST(request: NextRequest) {
       })
     } catch (error) {
       console.error('Error sending WhatsApp message:', error)
-    }
-
-    // 10) Optional: promote prospect to customer
-    if (analysis.intent === 'purchase') {
-      await supabaseServer
-        .from('customers')
-        .update({ status: 'customer' })
-        .eq('organization_id', organizationId)
-        .eq('id', customerId)
     }
 
     return new NextResponse('OK', { status: 200 })

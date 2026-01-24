@@ -168,3 +168,209 @@ ${productsText}`
     return []
   }
 }
+
+// ============================================================================
+// IMAGE PROCESSING - Payment Receipt & QR Analysis
+// ============================================================================
+
+export interface PaymentReceiptAnalysis {
+  isValid: boolean
+  confidence: number
+  extractedAmount: number | null
+  extractedDate: string | null
+  extractedReference: string | null
+  bankName: string | null
+  paymentMethod: 'bank_transfer' | 'qr_payment' | 'other' | null
+  description: string
+  warnings: string[]
+}
+
+/**
+ * Analyze a payment receipt image using Gemini Vision
+ * Extracts payment information from bank transfer receipts, QR payment screenshots, etc.
+ *
+ * @param imageData - Base64 encoded image or image URL
+ * @param expectedAmount - The expected payment amount to validate against
+ * @returns Analysis results with extracted payment information
+ */
+export async function analyzePaymentReceipt(
+  imageData: string,
+  expectedAmount?: number
+): Promise<PaymentReceiptAnalysis> {
+  try {
+    // Use Gemini Vision model for image analysis
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' })
+
+    const prompt = `Analyze this payment receipt/screenshot and extract all payment information.
+This could be a bank transfer receipt, Yape/Plin payment screenshot, or any payment confirmation.
+
+Extract the following information and respond with ONLY a JSON object (no markdown, no extra text):
+{
+  "isValid": boolean (true if this appears to be a legitimate payment receipt),
+  "confidence": 0.0 to 1.0 (how confident you are in the analysis),
+  "extractedAmount": number or null (the payment amount),
+  "extractedDate": "YYYY-MM-DD HH:mm:ss" or null (transaction date/time),
+  "extractedReference": string or null (transaction reference/operation number),
+  "bankName": string or null (name of bank or payment service),
+  "paymentMethod": "bank_transfer" | "qr_payment" | "other" | null,
+  "description": string (brief description of what you see),
+  "warnings": string[] (any red flags or concerns, empty array if none)
+}
+
+${expectedAmount ? `Expected amount: ${expectedAmount} (check if the receipt matches this amount)` : ''}
+
+Be thorough and look for:
+- Payment amounts (in any currency)
+- Date and time of transaction
+- Reference numbers, operation codes
+- Bank or payment service name (BCP, Interbank, BBVA, Yape, Plin, etc.)
+- Sender/receiver information
+- Any signs of image manipulation or fraud`
+
+    // Determine if imageData is a URL or base64
+    let imagePart
+    if (imageData.startsWith('http://') || imageData.startsWith('https://')) {
+      // Fetch image from URL and convert to base64
+      const response = await fetch(imageData)
+      const arrayBuffer = await response.arrayBuffer()
+      const base64 = Buffer.from(arrayBuffer).toString('base64')
+      const mimeType = response.headers.get('content-type') || 'image/jpeg'
+
+      imagePart = {
+        inlineData: {
+          data: base64,
+          mimeType: mimeType,
+        },
+      }
+    } else {
+      // Assume it's already base64
+      // Remove data URI prefix if present
+      const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '')
+
+      imagePart = {
+        inlineData: {
+          data: base64Data,
+          mimeType: 'image/jpeg',
+        },
+      }
+    }
+
+    const result = await model.generateContent([prompt, imagePart])
+    const text = result.response.text().trim()
+
+    // Remove markdown code blocks if present
+    const cleanedText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+
+    const analysis: PaymentReceiptAnalysis = JSON.parse(cleanedText)
+
+    // Additional validation: check if extracted amount matches expected amount
+    if (expectedAmount && analysis.extractedAmount) {
+      const difference = Math.abs(analysis.extractedAmount - expectedAmount)
+      const tolerance = expectedAmount * 0.01 // 1% tolerance
+
+      if (difference > tolerance) {
+        analysis.warnings.push(
+          `Amount mismatch: Expected ${expectedAmount}, found ${analysis.extractedAmount}`
+        )
+        analysis.confidence = Math.max(0.3, analysis.confidence - 0.3)
+      }
+    }
+
+    return analysis
+  } catch (error) {
+    console.error('Error analyzing payment receipt:', error)
+
+    // Return default analysis on error
+    return {
+      isValid: false,
+      confidence: 0,
+      extractedAmount: null,
+      extractedDate: null,
+      extractedReference: null,
+      bankName: null,
+      paymentMethod: null,
+      description: 'Error analyzing image',
+      warnings: ['Failed to process image'],
+    }
+  }
+}
+
+/**
+ * Detect and decode QR codes in payment images
+ * Useful for validating Yape/Plin QR payments
+ *
+ * @param imageData - Base64 encoded image or image URL
+ * @returns QR code content and analysis
+ */
+export async function analyzePaymentQR(imageData: string): Promise<{
+  hasQRCode: boolean
+  qrContent: string | null
+  paymentInfo: {
+    recipientPhone: string | null
+    recipientName: string | null
+    amount: number | null
+  } | null
+  confidence: number
+}> {
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' })
+
+    const prompt = `Analyze this image and look for QR codes related to payment (Yape, Plin, or other digital wallet QR).
+
+Extract the following and respond with ONLY a JSON object:
+{
+  "hasQRCode": boolean,
+  "qrContent": string or null (any visible text/data in or near the QR),
+  "paymentInfo": {
+    "recipientPhone": string or null,
+    "recipientName": string or null,
+    "amount": number or null
+  } or null,
+  "confidence": 0.0 to 1.0
+}
+
+Look for:
+- QR codes in the image
+- Phone numbers near the QR
+- Payment app logos (Yape, Plin)
+- Amount information
+- Recipient name`
+
+    let imagePart
+    if (imageData.startsWith('http://') || imageData.startsWith('https://')) {
+      const response = await fetch(imageData)
+      const arrayBuffer = await response.arrayBuffer()
+      const base64 = Buffer.from(arrayBuffer).toString('base64')
+      const mimeType = response.headers.get('content-type') || 'image/jpeg'
+
+      imagePart = {
+        inlineData: {
+          data: base64,
+          mimeType: mimeType,
+        },
+      }
+    } else {
+      const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '')
+      imagePart = {
+        inlineData: {
+          data: base64Data,
+          mimeType: 'image/jpeg',
+        },
+      }
+    }
+
+    const result = await model.generateContent([prompt, imagePart])
+    const text = result.response.text().trim()
+    const cleanedText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+
+    return JSON.parse(cleanedText)
+  } catch (error) {
+    console.error('Error analyzing QR code:', error)
+    return {
+      hasQRCode: false,
+      qrContent: null,
+      paymentInfo: null,
+      confidence: 0,
+    }
+  }
+}

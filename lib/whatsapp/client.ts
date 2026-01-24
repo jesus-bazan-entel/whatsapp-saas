@@ -181,9 +181,10 @@ type WhatsAppWebhookMessage = {
   timestamp: string
   type: 'text' | 'image' | 'document' | 'audio' | 'video' | 'location' | string
   text?: { body?: string }
-  image?: { caption?: string }
-  document?: { caption?: string }
-  video?: { caption?: string }
+  image?: { caption?: string; id?: string; mime_type?: string; sha256?: string }
+  document?: { caption?: string; id?: string; mime_type?: string; sha256?: string }
+  video?: { caption?: string; id?: string; mime_type?: string; sha256?: string }
+  audio?: { id?: string; mime_type?: string; sha256?: string }
   location?: { latitude?: number; longitude?: number }
 }
 
@@ -194,6 +195,9 @@ export function parseWhatsAppWebhook(body: unknown): {
   timestamp: number
   type: 'text' | 'image' | 'document' | 'audio' | 'video' | 'location' | 'unknown'
   phoneNumberId?: string
+  mediaId?: string
+  mediaUrl?: string
+  mimeType?: string
 } | null {
   try {
     const payload = body as WhatsAppWebhookPayload
@@ -219,6 +223,8 @@ export function parseWhatsAppWebhook(body: unknown): {
       | 'video'
       | 'location'
       | 'unknown' = 'unknown'
+    let mediaId: string | undefined
+    let mimeType: string | undefined
 
     if (msg.type === 'text') {
       messageText = msg.text?.body || ''
@@ -226,15 +232,23 @@ export function parseWhatsAppWebhook(body: unknown): {
     } else if (msg.type === 'image') {
       messageText = msg.image?.caption || '[Image received]'
       messageType = 'image'
+      mediaId = msg.image?.id
+      mimeType = msg.image?.mime_type
     } else if (msg.type === 'document') {
       messageText = msg.document?.caption || '[Document received]'
       messageType = 'document'
+      mediaId = msg.document?.id
+      mimeType = msg.document?.mime_type
     } else if (msg.type === 'audio') {
       messageText = '[Audio message received]'
       messageType = 'audio'
+      mediaId = msg.audio?.id
+      mimeType = msg.audio?.mime_type
     } else if (msg.type === 'video') {
       messageText = msg.video?.caption || '[Video received]'
       messageType = 'video'
+      mediaId = msg.video?.id
+      mimeType = msg.video?.mime_type
     } else if (msg.type === 'location') {
       const lat = msg.location?.latitude
       const lng = msg.location?.longitude
@@ -245,6 +259,15 @@ export function parseWhatsAppWebhook(body: unknown): {
       messageType = 'unknown'
     }
 
+    // If we have a mediaId, we'll need to fetch the URL using WhatsApp API
+    // For now, we'll return the mediaId and let the caller fetch the URL
+    // The URL fetching requires an authenticated API call
+    let mediaUrl: string | undefined
+    if (mediaId && phoneNumberId) {
+      // We'll set a placeholder that indicates the media needs to be fetched
+      mediaUrl = `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${mediaId}`
+    }
+
     return {
       messageId: msg.id,
       fromPhoneNumber: contact.wa_id,
@@ -252,6 +275,9 @@ export function parseWhatsAppWebhook(body: unknown): {
       timestamp: Number(msg.timestamp),
       type: messageType,
       phoneNumberId,
+      mediaId,
+      mediaUrl,
+      mimeType,
     }
   } catch (error) {
     console.error('Error parsing WhatsApp webhook:', error)
@@ -344,4 +370,73 @@ export async function markMessageAsReadForTenant(
   }
 
   return await response.json()
+}
+
+/**
+ * Get media URL from WhatsApp
+ * First, get the media URL from the media ID, then download the actual file
+ *
+ * @param mediaId - The media ID from the webhook
+ * @param accessToken - Access token for authentication
+ * @returns The media URL that can be downloaded
+ */
+export async function getWhatsAppMediaUrl(
+  mediaId: string,
+  accessToken: string
+): Promise<string> {
+  try {
+    // Step 1: Get media info (includes URL)
+    const url = `${WHATSAPP_API_URL}/${WHATSAPP_API_VERSION}/${mediaId}`
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(`WhatsApp API error: ${error.error?.message}`)
+    }
+
+    const data = await response.json() as { url?: string }
+    return data.url || ''
+  } catch (error) {
+    console.error('Error getting WhatsApp media URL:', error)
+    throw error
+  }
+}
+
+/**
+ * Download media from WhatsApp and convert to base64
+ *
+ * @param mediaUrl - The media URL from getWhatsAppMediaUrl
+ * @param accessToken - Access token for authentication
+ * @returns Base64 encoded media data
+ */
+export async function downloadWhatsAppMedia(
+  mediaUrl: string,
+  accessToken: string
+): Promise<string> {
+  try {
+    const response = await fetch(mediaUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to download media: ${response.statusText}`)
+    }
+
+    const arrayBuffer = await response.arrayBuffer()
+    const base64 = Buffer.from(arrayBuffer).toString('base64')
+
+    return base64
+  } catch (error) {
+    console.error('Error downloading WhatsApp media:', error)
+    throw error
+  }
 }
